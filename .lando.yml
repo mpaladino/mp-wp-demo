@@ -1,0 +1,6 @@
+name: mp-standard-wp
+recipe: pantheon
+config:
+  framework: wordpress
+  site: mp-standard-wp
+  id: c34bbf1a-f299-442a-8827-a69821a13e26
