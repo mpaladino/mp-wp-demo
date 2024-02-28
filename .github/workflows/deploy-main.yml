@@ -48,7 +48,8 @@ jobs:
       - name: Get Deployment Sites
         id: upstream-sites
         run: |
-          SITES=$(terminus org:site:list ${ORG_UUID} --format list --upstream ${UPSTREAM_UUID} --field name | sort -V | tr '\n' ',' | sed 's/,$//')
+          # SITES=$(terminus org:site:list ${ORG_UUID} --format list --upstream ${UPSTREAM_UUID} --field name | sort -V | tr '\n' ',' | sed 's/,$//')
+          SITES=${{ secrets.PANTHEON_SITE }}
           JSON_SITES="[\"$(echo "$SITES" | sed 's/,/","/g')\"]"
           echo "sites=$JSON_SITES" >> "$GITHUB_OUTPUT"
         env:
@@ -62,7 +63,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: ${{fromJson(needs.build.outputs.sites)}}
+        # site: ${{fromJson(needs.build.outputs.sites)}}
+        site: [${{ secrets.PANTHEON_SITE }}]
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
