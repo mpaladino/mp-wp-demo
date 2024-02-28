@@ -60,10 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        site: ${{fromJson(needs.build.outputs.sites)}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
@@ -80,7 +76,7 @@ jobs:
 
       - name: Apply upstream updates
         run: |
-          SITE=${{ matrix.site }}
+          SITE=${{ secrets.PANTHEON_SITE }}
           DEV=$(echo "${SITE}.dev")
           TEST=$(echo "${SITE}.test")
           START=$SECONDS
