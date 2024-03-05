@@ -83,6 +83,7 @@ jobs:
 
           CANARY_REPO=$(terminus connection:info $DEV --fields git_url --format list)
 
+          echo -e "$CANARY_REPO";
           echo -e "Starting deploy for ${SITE}...";
 
           # Setup remote branch connection
@@ -96,7 +97,7 @@ jobs:
           [[ -n ${_check_branch} ]] && git pull pantheon master --rebase
           
           # Sync branch
-          git push -u pantheon HEAD:refs/heads/master
+          # git push -u pantheon HEAD:refs/heads/master
 
           # Clear cache
           terminus env:clear-cache $DEV
