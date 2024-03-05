@@ -81,13 +81,22 @@ jobs:
           TEST=$(echo "${SITE}.test")
           START=$SECONDS
 
+          CANARY_REPO=$(terminus connection:info $DEV --fields git_url --format list)
+
           echo -e "Starting deploy for ${SITE}...";
 
-          # Check site upstream for updates, apply
-          terminus site:upstream:clear-cache $SITE
-
-          terminus connection:set $DEV git
-          terminus upstream:updates:apply $DEV --accept-upstream
+          # Setup remote branch connection
+          git remote add pantheon $CANARY_REPO
+          
+          # Fetch full history from pantheon
+          git fetch pantheon
+          
+          # Check if remote branch exists
+          _check_branch=$(git ls-remote --heads pantheon master)
+          [[ -n ${_check_branch} ]] && git pull pantheon master --rebase
+          
+          # Sync branch
+          git push -u pantheon HEAD:refs/heads/master
 
           # Clear cache
           terminus env:clear-cache $DEV
