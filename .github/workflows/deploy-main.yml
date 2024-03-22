@@ -68,6 +68,12 @@ jobs:
         - name: Checkout
           uses: actions/checkout@v4.1.0
 
+        - uses: shimataro/ssh-key-action@v2
+          with:
+            key: ${{ secrets.PANTHEON_SSH_KEY }}
+            config: ${{ secrets.SSH_CONFIG }}
+            known_hosts: ${{ secrets.KNOWN_HOSTS }}
+
         - name: Setup PHP
           uses: shivammathur/setup-php@v2
           with:
@@ -78,28 +84,43 @@ jobs:
           with:
             pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
+        - name: Get Committer Email and Name
+          run: |
+            COMMITTER_EMAIL=$(git log --format='%ae' -n 1 ${{ github.sha }})
+            COMMITTER_NAME=$(git log --format='%an' -n 1 ${{ github.sha }})
+
+            # Configure git defaults
+            git config --global user.email "$COMMITTER_EMAIL"
+            git config --global user.name "$COMMITTER_NAME"
+
         - name: Apply upstream updates
           run: |
-            SITE=${{ matrix.site }}
-            DEV=$(echo "${SITE}.dev")
-            TEST=$(echo "${SITE}.test")
-            START=$SECONDS
-
-            echo -e "Starting deploy for ${SITE}...";
-
-            # Check site upstream for updates, apply
-            terminus site:upstream:clear-cache $SITE
-
-            terminus connection:set $DEV git
-            terminus upstream:updates:apply $DEV --accept-upstream
-
-            # Clear cache
-            terminus env:clear-cache $DEV
-
-            # Deploy code to test and live
-
-            # Report time to results.
-            DURATION=$(( SECONDS - START ))
-            TIME_DIFF=$(bc <<< "scale=2; $DURATION / 60")
-            MIN=$(printf "%.2f" $TIME_DIFF)
-            echo -e "Finished ${SITE} in ${MIN} minutes"
+            CANARY_SITE=${{ secrets.PANTHEON_SITE }}
+            echo "CANARY_SITE=$CANARY_SITE" >> $GITHUB_ENV
+            CANARY_REPO=$(terminus connection:info ${CANARY_SITE}.dev --fields git_url --format list)
+            PANTHEON_MAIN_BRANCH_NAME=master
+            
+            # Setup remote git connection
+            git remote add pantheon $CANARY_REPO
+            
+            # Set to git mode
+            if terminus env:info $CANARY_SITE.dev > /dev/null 2>&1; then
+              terminus connection:set $CANARY_SITE.dev git
+            fi
+            
+            # Fetch full history from pantheon
+            git fetch pantheon
+            
+            # check for github master
+            echo "Checking for origin master. Create if non-existent"
+            git checkout main
+            _check_branch=$(git ls-remote --heads origin $PANTHEON_MAIN_BRANCH_NAME)
+            [[ -n ${_check_branch} ]] && git checkout -b $PANTHEON_MAIN_BRANCH_NAME && git push --set-upstream origin $PANTHEON_MAIN_BRANCH_NAME
+            
+            # Pull in changes from
+            echo "Pulling in changes from Main"
+            git pull origin main
+            
+            # Sync branch
+            echo "Pushing Github master changes to Pantheon"
+            git push -u pantheon $PANTHEON_MAIN_BRANCH_NAME
