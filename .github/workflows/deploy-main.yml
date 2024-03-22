@@ -56,71 +56,71 @@ jobs:
           ORG_UUID: ${{ secrets.PANTHEON_ORG_UUID }}
           UPSTREAM_UUID: ${{ secrets.PANTHEON_UPSTREAM_UUID }}
 
-    deploy:
-      runs-on: ubuntu-latest
-      if: github.event_name != 'pull_request'
-      needs: build
-      strategy:
-        fail-fast: false
-        matrix:
-          site: ${{fromJson(needs.build.outputs.sites)}}
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4.1.0
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{fromJson(needs.build.outputs.sites)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
 
-        - uses: shimataro/ssh-key-action@v2
-          with:
-            key: ${{ secrets.PANTHEON_SSH_KEY }}
-            config: ${{ secrets.SSH_CONFIG }}
-            known_hosts: ${{ secrets.KNOWN_HOSTS }}
+      - uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.PANTHEON_SSH_KEY }}
+          config: ${{ secrets.SSH_CONFIG }}
+          known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-        - name: Setup PHP
-          uses: shivammathur/setup-php@v2
-          with:
-            php-version: "8.1"
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
 
-        - name: Installing Terminus
-          uses: kyletaylored/terminus-github-actions@main
-          with:
-            pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+      - name: Installing Terminus
+        uses: kyletaylored/terminus-github-actions@main
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
-        - name: Get Committer Email and Name
-          run: |
-            COMMITTER_EMAIL=$(git log --format='%ae' -n 1 ${{ github.sha }})
-            COMMITTER_NAME=$(git log --format='%an' -n 1 ${{ github.sha }})
+      - name: Get Committer Email and Name
+        run: |
+          COMMITTER_EMAIL=$(git log --format='%ae' -n 1 ${{ github.sha }})
+          COMMITTER_NAME=$(git log --format='%an' -n 1 ${{ github.sha }})
 
-            # Configure git defaults
-            git config --global user.email "$COMMITTER_EMAIL"
-            git config --global user.name "$COMMITTER_NAME"
+          # Configure git defaults
+          git config --global user.email "$COMMITTER_EMAIL"
+          git config --global user.name "$COMMITTER_NAME"
 
-        - name: Apply upstream updates
-          run: |
-            CANARY_SITE=${{ secrets.PANTHEON_SITE }}
-            echo "CANARY_SITE=$CANARY_SITE" >> $GITHUB_ENV
-            CANARY_REPO=$(terminus connection:info ${CANARY_SITE}.dev --fields git_url --format list)
-            PANTHEON_MAIN_BRANCH_NAME=master
-            
-            # Setup remote git connection
-            git remote add pantheon $CANARY_REPO
-            
-            # Set to git mode
-            if terminus env:info $CANARY_SITE.dev > /dev/null 2>&1; then
-              terminus connection:set $CANARY_SITE.dev git
-            fi
-            
-            # Fetch full history from pantheon
-            git fetch pantheon
-            
-            # check for github master
-            echo "Checking for origin master. Create if non-existent"
-            git checkout main
-            _check_branch=$(git ls-remote --heads origin $PANTHEON_MAIN_BRANCH_NAME)
-            [[ -n ${_check_branch} ]] && git checkout -b $PANTHEON_MAIN_BRANCH_NAME && git push --set-upstream origin $PANTHEON_MAIN_BRANCH_NAME
-            
-            # Pull in changes from
-            echo "Pulling in changes from Main"
-            git pull origin main
-            
-            # Sync branch
-            echo "Pushing Github master changes to Pantheon"
-            git push -u pantheon $PANTHEON_MAIN_BRANCH_NAME
+      - name: Apply upstream updates
+        run: |
+          CANARY_SITE=${{ secrets.PANTHEON_SITE }}
+          echo "CANARY_SITE=$CANARY_SITE" >> $GITHUB_ENV
+          CANARY_REPO=$(terminus connection:info ${CANARY_SITE}.dev --fields git_url --format list)
+          PANTHEON_MAIN_BRANCH_NAME=master
+          
+          # Setup remote git connection
+          git remote add pantheon $CANARY_REPO
+          
+          # Set to git mode
+          if terminus env:info $CANARY_SITE.dev > /dev/null 2>&1; then
+            terminus connection:set $CANARY_SITE.dev git
+          fi
+          
+          # Fetch full history from pantheon
+          git fetch pantheon
+          
+          # check for github master
+          echo "Checking for origin master. Create if non-existent"
+          git checkout main
+          _check_branch=$(git ls-remote --heads origin $PANTHEON_MAIN_BRANCH_NAME)
+          [[ -n ${_check_branch} ]] && git checkout -b $PANTHEON_MAIN_BRANCH_NAME && git push --set-upstream origin $PANTHEON_MAIN_BRANCH_NAME
+          
+          # Pull in changes from
+          echo "Pulling in changes from Main"
+          git pull origin main
+          
+          # Sync branch
+          echo "Pushing Github master changes to Pantheon"
+          git push -u pantheon $PANTHEON_MAIN_BRANCH_NAME
