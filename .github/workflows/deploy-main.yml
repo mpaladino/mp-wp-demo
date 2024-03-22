@@ -56,56 +56,50 @@ jobs:
           ORG_UUID: ${{ secrets.PANTHEON_ORG_UUID }}
           UPSTREAM_UUID: ${{ secrets.PANTHEON_UPSTREAM_UUID }}
 
-  deploy:
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    needs: build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.0
+    deploy:
+      runs-on: ubuntu-latest
+      if: github.event_name != 'pull_request'
+      needs: build
+      strategy:
+        fail-fast: false
+        matrix:
+          site: ${{fromJson(needs.build.outputs.sites)}}
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4.1.0
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.1"
+        - name: Setup PHP
+          uses: shivammathur/setup-php@v2
+          with:
+            php-version: "8.1"
 
-      - name: Installing Terminus
-        uses: kyletaylored/terminus-github-actions@main
-        with:
-          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+        - name: Installing Terminus
+          uses: kyletaylored/terminus-github-actions@main
+          with:
+            pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
-      - name: Apply upstream updates
-        run: |
-          SITE=${{ secrets.PANTHEON_SITE }}
-          DEV=$(echo "${SITE}.dev")
-          TEST=$(echo "${SITE}.test")
-          START=$SECONDS
+        - name: Apply upstream updates
+          run: |
+            SITE=${{ matrix.site }}
+            DEV=$(echo "${SITE}.dev")
+            TEST=$(echo "${SITE}.test")
+            START=$SECONDS
 
-          CANARY_REPO=$(terminus connection:info $DEV --fields git_url --format list)
+            echo -e "Starting deploy for ${SITE}...";
 
-          echo -e "$CANARY_REPO";
-          echo -e "Starting deploy for ${SITE}...";
+            # Check site upstream for updates, apply
+            terminus site:upstream:clear-cache $SITE
 
-          # Setup remote branch connection
-          git remote add pantheon $CANARY_REPO
-          
-          # Fetch full history from pantheon
-          git fetch pantheon
-          
-          # Check if remote branch exists
-          _check_branch=$(git ls-remote --heads pantheon master)
-          [[ -n ${_check_branch} ]] && git pull pantheon master --rebase
-          
-          # Sync branch
-          # git push -u pantheon HEAD:refs/heads/master
+            terminus connection:set $DEV git
+            terminus upstream:updates:apply $DEV --accept-upstream
 
-          # Clear cache
-          terminus env:clear-cache $DEV
+            # Clear cache
+            terminus env:clear-cache $DEV
 
-          # Deploy code to test and live
+            # Deploy code to test and live
 
-          # Report time to results.
-          DURATION=$(( SECONDS - START ))
-          TIME_DIFF=$(bc <<< "scale=2; $DURATION / 60")
-          MIN=$(printf "%.2f" $TIME_DIFF)
-          echo -e "Finished ${SITE} in ${MIN} minutes"
+            # Report time to results.
+            DURATION=$(( SECONDS - START ))
+            TIME_DIFF=$(bc <<< "scale=2; $DURATION / 60")
+            MIN=$(printf "%.2f" $TIME_DIFF)
+            echo -e "Finished ${SITE} in ${MIN} minutes"
