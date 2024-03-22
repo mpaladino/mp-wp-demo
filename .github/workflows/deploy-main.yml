@@ -60,10 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        site: ${{fromJson(needs.build.outputs.sites)}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
