@@ -120,7 +120,7 @@ jobs:
           
           # Pull in changes from
           echo "Pulling in changes from Main"
-          git pull origin main
+          git pull origin main --rebase
           
           # Sync branch
           echo "Pushing Github master changes to Pantheon"
