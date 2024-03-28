@@ -109,5 +109,4 @@ jobs:
           
           # Sync branch
           echo "Pushing Github master changes to Pantheon"
-          git pull pantheon $PANTHEON_MAIN_BRANCH_NAME
-          git push -u pantheon $PANTHEON_MAIN_BRANCH_NAME
+          git push pantheon $PANTHEON_MAIN_BRANCH_NAME --force
