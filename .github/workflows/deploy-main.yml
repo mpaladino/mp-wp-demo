@@ -107,20 +107,6 @@ jobs:
           # Fetch full history from pantheon
           git fetch pantheon
           
-          # check for github master
-          echo "Checking for origin master. Create if non-existent"
-          _check_branch=$(git ls-remote --heads origin $PANTHEON_MAIN_BRANCH_NAME)
-          if [ -z ${_check_branch} ]; then 
-            git checkout -b $PANTHEON_MAIN_BRANCH_NAME
-            git push --set-upstream origin $PANTHEON_MAIN_BRANCH_NAME
-          else 
-            git checkout $PANTHEON_MAIN_BRANCH_NAME
-          fi
-          
-          # Pull in changes from
-          echo "Pulling in changes from Main"
-          git pull origin main --rebase
-          
           # Sync branch
           echo "Pushing Github master changes to Pantheon"
           git pull pantheon $PANTHEON_MAIN_BRANCH_NAME
