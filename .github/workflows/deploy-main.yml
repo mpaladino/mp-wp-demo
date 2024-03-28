@@ -109,4 +109,6 @@ jobs:
           git remote remove origin
           git init
           git remote add origin git@github.com:mpaladino/mp-wp-demo.git
+          git pull origin master
+          git pull pantheon master
           git push pantheon master
