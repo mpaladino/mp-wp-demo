@@ -109,7 +109,6 @@ jobs:
           
           # check for github master
           echo "Checking for origin master. Create if non-existent"
-          git checkout main
           _check_branch=$(git ls-remote --heads origin $PANTHEON_MAIN_BRANCH_NAME)
           if [ -z ${_check_branch} ]; then 
             git checkout -b $PANTHEON_MAIN_BRANCH_NAME
