@@ -105,7 +105,7 @@ jobs:
           fi
           
           # Fetch full history from pantheon
-          git fetch --unshallow pantheon
+          git fetch pantheon
           
           # Sync branch
           echo "Pushing Github master changes to Pantheon"
