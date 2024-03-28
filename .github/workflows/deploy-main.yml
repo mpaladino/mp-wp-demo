@@ -105,8 +105,8 @@ jobs:
           fi
           
           # Fetch full history from pantheon
-          git fetch pantheon
-          
-          # Sync branch
-          echo "Pushing Github master changes to Pantheon"
-          git push pantheon $PANTHEON_MAIN_BRANCH_NAME --force
+          git fetch --unshallow pantheon
+          git remote remove origin
+          git init
+          git remote add origin git@github.com:mpaladino/mp-wp-demo.git
+          git push pantheon master
