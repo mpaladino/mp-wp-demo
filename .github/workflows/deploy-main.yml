@@ -110,5 +110,5 @@ jobs:
           git init
           git remote add origin git@github.com:mpaladino/mp-wp-demo.git
           git pull origin master
-          git pull pantheon master --no-rebase
+          git pull pantheon master --no-rebase --allow-unrelated-histories
           git push pantheon master
