@@ -1,4 +1,4 @@
-name: Deploy Downstream Sites
+name: Deploy Downstream Sites (Git)
 on:
   pull_request:
     types: [closed]
@@ -29,9 +29,22 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           PR_BRANCH_NAME="pr-${{ github.event.pull_request.number }}"
-          CANARY_SITE=${{ secrets.PANTHEON_SITE }}
-          if terminus env:info $CANARY_SITE.$PR_BRANCH_NAME > /dev/null 2>&1; then
-            terminus env:delete $CANARY_SITE.$PR_BRANCH_NAME -y --delete-branch
+
+          # Check if PANTHEON_SITE_UUID secret is set and valid
+          if [[ -n "${{ secrets.PANTHEON_SITE_UUID }}" ]] && terminus site:info ${{ secrets.PANTHEON_SITE_UUID }}; then
+            SITE_UUID=${{ secrets.PANTHEON_SITE_UUID }}
+          else
+            # If PANTHEON_SITE_UUID is not set or not valid, retrieve CANARY_SITE
+            CANARY_SITE=$(terminus org:site:list ${ORG_UUID} --format list --upstream ${UPSTREAM_UUID} --field name --tag canary | head -1)
+            if [[ -z "${CANARY_SITE}" ]]; then
+              echo "Failed to retrieve site with 'canary' tag."
+              exit 1
+            fi
+            SITE_UUID=$CANARY_SITE
+          fi
+
+          if terminus env:info $SITE_UUID.$PR_BRANCH_NAME > /dev/null 2>&1; then
+            terminus env:delete $SITE_UUID.$PR_BRANCH_NAME -y --delete-branch
           fi
 
           # Check if PR was merged
@@ -48,8 +61,7 @@ jobs:
       - name: Get Deployment Sites
         id: upstream-sites
         run: |
-          # SITES=$(terminus org:site:list ${ORG_UUID} --format list --upstream ${UPSTREAM_UUID} --field name | sort -V | tr '\n' ',' | sed 's/,$//')
-          SITES=${{ secrets.PANTHEON_SITE }}
+          SITES=$(terminus org:site:list ${ORG_UUID} --format list --upstream ${UPSTREAM_UUID} --field name | sort -V | tr '\n' ',' | sed 's/,$//')
           JSON_SITES="[\"$(echo "$SITES" | sed 's/,/","/g')\"]"
           echo "sites=$JSON_SITES" >> "$GITHUB_OUTPUT"
         env:
@@ -60,15 +72,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{fromJson(needs.build.outputs.sites)}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
-
-      - uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.PANTHEON_SSH_KEY }}
-          config: ${{ secrets.SSH_CONFIG }}
-          known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -80,35 +90,28 @@ jobs:
         with:
           pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
-      - name: Get Committer Email and Name
-        run: |
-          COMMITTER_EMAIL=$(git log --format='%ae' -n 1 ${{ github.sha }})
-          COMMITTER_NAME=$(git log --format='%an' -n 1 ${{ github.sha }})
-
-          # Configure git defaults
-          git config --global user.email "$COMMITTER_EMAIL"
-          git config --global user.name "$COMMITTER_NAME"
-
       - name: Apply upstream updates
         run: |
-          CANARY_SITE=${{ secrets.PANTHEON_SITE }}
-          echo "CANARY_SITE=$CANARY_SITE" >> $GITHUB_ENV
-          CANARY_REPO=$(terminus connection:info ${CANARY_SITE}.dev --fields git_url --format list)
-          PANTHEON_MAIN_BRANCH_NAME=master
-          
-          # Setup remote git connection
-          git remote add pantheon $CANARY_REPO
-          
-          # Set to git mode
-          if terminus env:info $CANARY_SITE.dev > /dev/null 2>&1; then
-            terminus connection:set $CANARY_SITE.dev git
-          fi
-          
-          # Fetch full history from pantheon
-          git fetch --unshallow pantheon
-          git remote remove origin
-          git init
-          git remote add origin git@github.com:mpaladino/mp-wp-demo.git
-          git pull origin master
-          git pull pantheon master --no-rebase --allow-unrelated-histories
-          git push pantheon master
+          SITE=${{ matrix.site }}
+          DEV=$(echo "${SITE}.dev")
+          TEST=$(echo "${SITE}.test")
+          START=$SECONDS
+
+          echo -e "Starting deploy for ${SITE}...";
+
+          # Check site upstream for updates, apply
+          terminus site:upstream:clear-cache $SITE
+
+          terminus connection:set $DEV git
+          terminus upstream:updates:apply $DEV --accept-upstream
+
+          # Clear cache
+          terminus env:clear-cache $DEV
+
+          # Deploy code to test and live
+
+          # Report time to results.
+          DURATION=$(( SECONDS - START ))
+          TIME_DIFF=$(bc <<< "scale=2; $DURATION / 60")
+          MIN=$(printf "%.2f" $TIME_DIFF)
+          echo -e "Finished ${SITE} in ${MIN} minutes"
