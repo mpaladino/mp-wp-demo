@@ -1,6 +1,6 @@
 WordPress - Web publishing software
 
-New Text 2
+New Text 3
 
 Copyright 2011-2023 by the contributors
 
